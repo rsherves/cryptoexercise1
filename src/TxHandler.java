@@ -1,3 +1,5 @@
+import java.util.List;
+
 public class TxHandler {
 
     private UTXOPool utxoPool;
@@ -13,7 +15,7 @@ public class TxHandler {
 
     /**
      * @return true if:
-     * (1) all outputs claimed by {@code tx} are in the current UTXO pool, 
+     * (1) all inputs claimed by {@code tx} are in the current UTXO pool,
      * (2) the signatures on each input of {@code tx} are valid, 
      * (3) no UTXO is claimed multiple times by {@code tx},
      * (4) all of {@code tx}s output values are non-negative, and
@@ -22,6 +24,23 @@ public class TxHandler {
      */
     public boolean isValidTx(Transaction tx) {
         // IMPLEMENT THIS
+        return tx != null
+                && areUnspent(tx.getInputs())
+                && haveValidSignatures(tx.getInputs())
+                // && !hasDoubleSpend(tx.getInputs())
+                // && !haveNegativeValues(tx.getOutputs())
+                // && sumValue(tx.getInputs()) >= sumValue(tx.getOutputs())
+                ;
+    }
+
+    private boolean areUnspent(List<Transaction.Input> inputs) {
+        return inputs.stream()
+                .map(i -> new UTXO(i.prevTxHash, i.outputIndex))
+                .allMatch(u -> utxoPool.contains(u));
+    }
+
+    private boolean haveValidSignatures(List<Transaction.Input> inputs) {
+        // TODO
         return false;
     }
 
