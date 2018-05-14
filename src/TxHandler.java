@@ -1,3 +1,4 @@
+import java.security.PublicKey;
 import java.util.List;
 
 public class TxHandler {
@@ -26,7 +27,7 @@ public class TxHandler {
         // IMPLEMENT THIS
         return tx != null
                 && areUnspent(tx.getInputs())
-                && haveValidSignatures(tx.getInputs())
+                && haveValidSignatures(tx)
                 // && !hasDoubleSpend(tx.getInputs())
                 // && !haveNegativeValues(tx.getOutputs())
                 // && sumValue(tx.getInputs()) >= sumValue(tx.getOutputs())
@@ -39,9 +40,19 @@ public class TxHandler {
                 .allMatch(u -> utxoPool.contains(u));
     }
 
-    private boolean haveValidSignatures(List<Transaction.Input> inputs) {
-        // TODO
-        return false;
+    private boolean haveValidSignatures(Transaction tx) {
+        List<Transaction.Input> inputs = tx.getInputs();
+        for (int i = 0; i < inputs.size(); i++) {
+            Transaction.Input input = inputs.get(i);
+            byte[] signature = input.signature;
+            byte[] message = tx.getRawDataToSign(i);
+            PublicKey publicKey = null; // TODO pKeys are in the outputs of the previous tx
+
+            if (!Crypto.verifySignature(publicKey, message, signature)) {
+                return false;
+            }
+        }
+        return true;
     }
 
     /**
