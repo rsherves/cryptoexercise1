@@ -26,14 +26,12 @@ public class TxHandler {
      *     values; and false otherwise.
      */
     public boolean isValidTx(Transaction tx) {
-        // IMPLEMENT THIS
         return tx != null
                 && areUnspent(tx.getInputs())
                 && haveValidSignatures(tx)
                 && !hasDoubleSpend(tx.getInputs())
-                // && !haveNegativeValues(tx.getOutputs())
-                // && sumValue(tx.getInputs()) >= sumValue(tx.getOutputs())
-                ;
+                && !hasNegativeOutputValues(tx.getOutputs())
+                && !createsValue(tx);
     }
 
     private boolean areUnspent(List<Transaction.Input> inputs) {
@@ -67,6 +65,23 @@ public class TxHandler {
                 .map(i -> new UTXO(i.prevTxHash, i.outputIndex))
                 .collect(Collectors.toSet());
         return inputs.size() > uniqueInputs.size();
+    }
+
+    private boolean hasNegativeOutputValues(List<Transaction.Output> outputs) {
+        return outputs.stream().allMatch(o -> o.value >= 0);
+    }
+
+    private boolean createsValue(Transaction tx) {
+        double inputsValue = tx.getInputs().stream()
+                .map(i -> new UTXO(i.prevTxHash, i.outputIndex))
+                .filter(utxo -> utxoPool.contains(utxo))
+                .map(utxo -> utxoPool.getTxOutput(utxo))
+                .mapToDouble(output -> output.value)
+                .sum();
+        double outputsValue = tx.getOutputs().stream()
+                .mapToDouble(output -> output.value)
+                .sum();
+        return outputsValue > inputsValue;
     }
 
     /**
