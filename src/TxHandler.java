@@ -1,5 +1,7 @@
 import java.security.PublicKey;
 import java.util.List;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 public class TxHandler {
 
@@ -28,7 +30,7 @@ public class TxHandler {
         return tx != null
                 && areUnspent(tx.getInputs())
                 && haveValidSignatures(tx)
-                // && !hasDoubleSpend(tx.getInputs())
+                && !hasDoubleSpend(tx.getInputs())
                 // && !haveNegativeValues(tx.getOutputs())
                 // && sumValue(tx.getInputs()) >= sumValue(tx.getOutputs())
                 ;
@@ -58,6 +60,13 @@ public class TxHandler {
             }
         }
         return true;
+    }
+
+    private boolean hasDoubleSpend(List<Transaction.Input> inputs) {
+        Set<UTXO> uniqueInputs = inputs.stream()
+                .map(i -> new UTXO(i.prevTxHash, i.outputIndex))
+                .collect(Collectors.toSet());
+        return inputs.size() > uniqueInputs.size();
     }
 
     /**
