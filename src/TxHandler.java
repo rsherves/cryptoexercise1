@@ -44,9 +44,14 @@ public class TxHandler {
         List<Transaction.Input> inputs = tx.getInputs();
         for (int i = 0; i < inputs.size(); i++) {
             Transaction.Input input = inputs.get(i);
+            UTXO utxo = new UTXO(input.prevTxHash, input.outputIndex);
+            if (!utxoPool.contains(utxo)) {
+                return false;
+            }
+            Transaction.Output output = utxoPool.getTxOutput(utxo);
+            PublicKey publicKey = output.address;
             byte[] signature = input.signature;
             byte[] message = tx.getRawDataToSign(i);
-            PublicKey publicKey = null; // TODO pKeys are in the outputs of the previous tx
 
             if (!Crypto.verifySignature(publicKey, message, signature)) {
                 return false;
