@@ -1,6 +1,6 @@
 import java.security.PublicKey;
-import java.util.List;
-import java.util.Set;
+import java.util.*;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 
 public class TxHandler {
@@ -90,8 +90,73 @@ public class TxHandler {
      * updating the current UTXO pool as appropriate.
      */
     public Transaction[] handleTxs(Transaction[] possibleTxs) {
-        // IMPLEMENT THIS
-        return null;
+        Transaction[] acceptedTxs = findLargestValidTxSet(possibleTxs);
+        updateUtxoPool(acceptedTxs);
+        return acceptedTxs;
     }
 
+    private Transaction[] findLargestValidTxSet(Transaction[] possibleTxs) {
+        TxCollection txs = new TxCollection(possibleTxs).withoutDuplicates();
+
+        return null; //TODO
+    }
+
+    private void updateUtxoPool(Transaction[] acceptedTxs) {
+        //TODO
+    }
+
+
+    private class TxCollection {
+        private List<Transaction> transactions = new ArrayList<>();
+        private List<List<Transaction>> permutations;
+
+        private TxCollection(Transaction[] txs) {
+            if (txs != null) {
+                transactions.addAll(Arrays.asList(txs));
+            }
+            permutations(new ArrayList<Transaction>(transactions), 0, Collections.emptyList());
+        }
+
+        private TxCollection withoutDuplicates() {
+            Map<byte[], Transaction> txsByHash = transactions.stream().collect(Collectors.toMap(
+                    Transaction::getHash,
+                    Function.identity(),
+                    (t1, t2) -> t1));
+            transactions = new ArrayList<>(txsByHash.values());
+            permutations(new ArrayList<Transaction>(transactions), 0, Collections.emptyList());
+            return this;
+        }
+
+        private void permutations(List<Transaction> txs, int index, List<Transaction> permutation) {
+            if (index < txs.size()) {
+                for (Transaction t : minus(txs, permutation)) {
+                    permutations(txs, index + 1, union(permutation, t));
+                }
+            } else {
+                permutations.add(permutation);
+            }
+        }
+
+        private List<Transaction> minus(List<Transaction> set, List<Transaction> subset) {
+            List<Transaction> result = new ArrayList<>(set);
+            for (Transaction t : subset) {
+                result.remove(t);
+            }
+            return result;
+        }
+
+        private List<Transaction> union(List<Transaction> txs, Transaction t) {
+            List<Transaction> result = new ArrayList<>(txs);
+            result.add(t);
+            return result;
+        }
+
+        private List<Transaction> list() {
+            return transactions;
+        }
+
+        private List<List<Transaction>> permutations() {
+            return permutations;
+        }
+    }
 }
