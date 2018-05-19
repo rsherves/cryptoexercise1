@@ -108,7 +108,7 @@ public class TxHandler {
 
     private class UniqueTxCollection {
         private final List<Transaction> transactions;
-        private List<List<Transaction>> permutations;
+        private final TxPermutations permutations;
 
         private UniqueTxCollection(Transaction[] txs) {
             if (txs == null) {
@@ -120,39 +120,52 @@ public class TxHandler {
                         (t1, t2) -> t1));
                 transactions = Collections.unmodifiableList(new ArrayList<>(txsByHash.values()));
             }
-            permutations(new ArrayList<Transaction>(transactions), 0, Collections.emptyList());
-        }
-
-        private void permutations(List<Transaction> txs, int index, List<Transaction> permutation) {
-            if (index < txs.size()) {
-                for (Transaction t : minus(txs, permutation)) {
-                    permutations(txs, index + 1, union(permutation, t));
-                }
-            } else {
-                permutations.add(permutation);
-            }
-        }
-
-        private List<Transaction> minus(List<Transaction> set, List<Transaction> subset) {
-            List<Transaction> result = new ArrayList<>(set);
-            for (Transaction t : subset) {
-                result.remove(t);
-            }
-            return result;
-        }
-
-        private List<Transaction> union(List<Transaction> txs, Transaction t) {
-            List<Transaction> result = new ArrayList<>(txs);
-            result.add(t);
-            return result;
+            permutations = new TxPermutations();
         }
 
         private List<Transaction> list() {
-            return transactions;
+            return Collections.unmodifiableList(transactions);
         }
 
         private List<List<Transaction>> permutations() {
-            return permutations;
+            return permutations.list();
+        }
+
+
+        private class TxPermutations {
+            private final List<List<Transaction>> permutations = new ArrayList<>();
+
+            private TxPermutations() {
+                permutations(transactions, 0, Collections.emptyList());
+            }
+
+            private void permutations(List<Transaction> txs, int index, List<Transaction> permutation) {
+                if (index < txs.size()) {
+                    for (Transaction t : minus(txs, permutation)) {
+                        permutations(txs, index + 1, union(permutation, t));
+                    }
+                } else {
+                    permutations.add(permutation);
+                }
+            }
+
+            private List<Transaction> minus(List<Transaction> set, List<Transaction> subset) {
+                List<Transaction> result = new ArrayList<>(set);
+                for (Transaction t : subset) {
+                    result.remove(t);
+                }
+                return Collections.unmodifiableList(result);
+            }
+
+            private List<Transaction> union(List<Transaction> txs, Transaction t) {
+                List<Transaction> result = new ArrayList<>(txs);
+                result.add(t);
+                return Collections.unmodifiableList(result);
+            }
+
+            private List<List<Transaction>> list() {
+                return Collections.unmodifiableList(permutations);
+            }
         }
     }
 }
