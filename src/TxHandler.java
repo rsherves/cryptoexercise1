@@ -176,17 +176,18 @@ public class TxHandler {
 
         private boolean isValid(Transaction tx) {
             return tx != null
-                    && areUnspent(tx.getInputs())
+                    && hasValidInputs(tx)
                     && haveValidSignatures(tx)
                     && !hasDoubleSpend(tx.getInputs())
                     && !hasNegativeOutputValues(tx.getOutputs())
                     && !createsValue(tx);
         }
 
-        private boolean areUnspent(List<Transaction.Input> inputs) {
-            return inputs.stream()
-                    .map(i -> new UTXO(i.prevTxHash, i.outputIndex))
-                    .allMatch(validationUtxoPool::contains);
+        private boolean hasValidInputs(Transaction tx) {
+            return tx.getInputs().stream()
+                    .allMatch(i -> i != null
+                            && i.prevTxHash != null
+                            && validationUtxoPool.contains(new UTXO(i.prevTxHash, i.outputIndex)));
         }
 
         private boolean haveValidSignatures(Transaction tx) {
@@ -202,7 +203,7 @@ public class TxHandler {
                 byte[] signature = input.signature;
                 byte[] message = tx.getRawDataToSign(i);
 
-                if (!Crypto.verifySignature(publicKey, message, signature)) {
+                if (signature == null || !Crypto.verifySignature(publicKey, message, signature)) {
                     return false;
                 }
             }
