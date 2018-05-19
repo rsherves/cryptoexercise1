@@ -182,7 +182,7 @@ public class TxHandler {
         private boolean areUnspent(List<Transaction.Input> inputs) {
             return inputs.stream()
                     .map(i -> new UTXO(i.prevTxHash, i.outputIndex))
-                    .allMatch(u -> validationUtxoPool.contains(u));
+                    .allMatch(validationUtxoPool::contains);
         }
 
         private boolean haveValidSignatures(Transaction tx) {
@@ -219,8 +219,8 @@ public class TxHandler {
         private boolean createsValue(Transaction tx) {
             double inputsValue = tx.getInputs().stream()
                     .map(i -> new UTXO(i.prevTxHash, i.outputIndex))
-                    .filter(utxo -> validationUtxoPool.contains(utxo))
-                    .map(utxo -> validationUtxoPool.getTxOutput(utxo))
+                    .filter(validationUtxoPool::contains)
+                    .map(validationUtxoPool::getTxOutput)
                     .mapToDouble(output -> output.value)
                     .sum();
             double outputsValue = tx.getOutputs().stream()
@@ -233,7 +233,7 @@ public class TxHandler {
             if (isValid(tx)) {
                 tx.getInputs().stream()
                         .map(i -> new UTXO(i.prevTxHash, i.outputIndex))
-                        .forEach(u -> validationUtxoPool.removeUTXO(u));
+                        .forEach(validationUtxoPool::removeUTXO);
 
                 List<Transaction.Output> outputs = tx.getOutputs();
                 for (int i=0; i<outputs.size(); i++) {
