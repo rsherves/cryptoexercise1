@@ -80,7 +80,18 @@ public class TxHandler {
     }
 
     private void updateUtxoPool(Transaction[] acceptedTxs) {
-        //TODO
+        for (Transaction tx : acceptedTxs) {
+            if (isValidTx(tx)) {
+                tx.getInputs().stream()
+                        .map(i -> new UTXO(i.prevTxHash, i.outputIndex))
+                        .forEach(utxoPool::removeUTXO);
+
+                List<Transaction.Output> outputs = tx.getOutputs();
+                for (int i=0; i<outputs.size(); i++) {
+                    utxoPool.addUTXO(new UTXO(tx.getHash(), i), outputs.get(i));
+                }
+            }
+        }
     }
 
 
