@@ -96,7 +96,7 @@ public class TxHandler {
     }
 
     private Transaction[] findLargestValidTxSet(Transaction[] possibleTxs) {
-        TxCollection txs = new TxCollection(possibleTxs).withoutDuplicates();
+        UniqueTxCollection txs = new UniqueTxCollection(possibleTxs);
 
         return null; //TODO
     }
@@ -106,25 +106,21 @@ public class TxHandler {
     }
 
 
-    private class TxCollection {
-        private List<Transaction> transactions = new ArrayList<>();
+    private class UniqueTxCollection {
+        private final List<Transaction> transactions;
         private List<List<Transaction>> permutations;
 
-        private TxCollection(Transaction[] txs) {
-            if (txs != null) {
-                transactions.addAll(Arrays.asList(txs));
+        private UniqueTxCollection(Transaction[] txs) {
+            if (txs == null) {
+                transactions = Collections.emptyList();
+            } else {
+                Map<byte[], Transaction> txsByHash = Arrays.stream(txs).collect(Collectors.toMap(
+                        Transaction::getHash,
+                        Function.identity(),
+                        (t1, t2) -> t1));
+                transactions = Collections.unmodifiableList(new ArrayList<>(txsByHash.values()));
             }
             permutations(new ArrayList<Transaction>(transactions), 0, Collections.emptyList());
-        }
-
-        private TxCollection withoutDuplicates() {
-            Map<byte[], Transaction> txsByHash = transactions.stream().collect(Collectors.toMap(
-                    Transaction::getHash,
-                    Function.identity(),
-                    (t1, t2) -> t1));
-            transactions = new ArrayList<>(txsByHash.values());
-            permutations(new ArrayList<Transaction>(transactions), 0, Collections.emptyList());
-            return this;
         }
 
         private void permutations(List<Transaction> txs, int index, List<Transaction> permutation) {
