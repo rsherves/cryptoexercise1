@@ -96,9 +96,35 @@ public class TxHandler {
     }
 
     private Transaction[] findLargestValidTxSet(Transaction[] possibleTxs) {
-        UniqueTxCollection txs = new UniqueTxCollection(possibleTxs);
+        UniqueTxCollection uniqueTxs = new UniqueTxCollection(possibleTxs);
+        List<Transaction> largestTxSet = new ArrayList<>();
 
-        return null; //TODO
+        for (List<Transaction> txs : uniqueTxs.permutations()) {
+            List<Transaction> validTxs = new ArrayList<>();
+            for (int i=0; i<txs.size(); i++) {
+                Transaction t = txs.get(i);
+                if (isValidTx(t)) { //TODO validates txs in isolation, it can't be
+                    validTxs.add(t);
+                }
+                if (validTxs.size() == uniqueTxs.size()) {
+                    return toArray(txs);
+                } else if (validTxs.size() > largestTxSet.size()) {
+                    largestTxSet = validTxs;
+                }
+            }
+        }
+        return toArray(largestTxSet);
+    }
+
+    private Transaction[] toArray (List<Transaction> txs) {
+        if (txs == null || txs.isEmpty()) {
+            return null;
+        }
+        Transaction[] result = new Transaction[txs.size()];
+        for (int i=0; i<txs.size(); i++) {
+            result[i] = txs.get(i);
+        }
+        return result;
     }
 
     private void updateUtxoPool(Transaction[] acceptedTxs) {
@@ -129,6 +155,10 @@ public class TxHandler {
 
         private List<List<Transaction>> permutations() {
             return permutations.list();
+        }
+
+        private int size() {
+            return transactions.size();
         }
 
 
