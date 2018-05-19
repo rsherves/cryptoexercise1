@@ -70,7 +70,7 @@ public class TxHandler {
 
     private Transaction[] toArray (List<Transaction> txs) {
         if (txs == null || txs.isEmpty()) {
-            return null;
+            return new Transaction[0];
         }
         Transaction[] result = new Transaction[txs.size()];
         for (int i=0; i<txs.size(); i++) {
@@ -80,15 +80,17 @@ public class TxHandler {
     }
 
     private void updateUtxoPool(Transaction[] acceptedTxs) {
-        for (Transaction tx : acceptedTxs) {
-            if (isValidTx(tx)) {
-                tx.getInputs().stream()
-                        .map(i -> new UTXO(i.prevTxHash, i.outputIndex))
-                        .forEach(utxoPool::removeUTXO);
+        if (acceptedTxs != null) {
+            for (Transaction tx : acceptedTxs) {
+                if (isValidTx(tx)) {
+                    tx.getInputs().stream()
+                            .map(i -> new UTXO(i.prevTxHash, i.outputIndex))
+                            .forEach(utxoPool::removeUTXO);
 
-                List<Transaction.Output> outputs = tx.getOutputs();
-                for (int i=0; i<outputs.size(); i++) {
-                    utxoPool.addUTXO(new UTXO(tx.getHash(), i), outputs.get(i));
+                    List<Transaction.Output> outputs = tx.getOutputs();
+                    for (int i=0; i<outputs.size(); i++) {
+                        utxoPool.addUTXO(new UTXO(tx.getHash(), i), outputs.get(i));
+                    }
                 }
             }
         }
@@ -103,10 +105,12 @@ public class TxHandler {
             if (txs == null) {
                 transactions = Collections.emptyList();
             } else {
-                Map<byte[], Transaction> txsByHash = Arrays.stream(txs).collect(Collectors.toMap(
-                        Transaction::getHash,
-                        Function.identity(),
-                        (t1, t2) -> t1));
+                Map<byte[], Transaction> txsByHash = Arrays.stream(txs)
+                        .filter(t -> t != null)
+                        .collect(Collectors.toMap(
+                                Transaction::getHash,
+                                Function.identity(),
+                                (t1, t2) -> t1));
                 transactions = Collections.unmodifiableList(new ArrayList<>(txsByHash.values()));
             }
             permutations = new TxPermutations();
@@ -213,7 +217,7 @@ public class TxHandler {
         }
 
         private boolean hasNegativeOutputValues(List<Transaction.Output> outputs) {
-            return outputs.stream().allMatch(o -> o.value >= 0);
+            return outputs.stream().anyMatch(o -> o.value < 0);
         }
 
         private boolean createsValue(Transaction tx) {
