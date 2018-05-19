@@ -5,7 +5,7 @@ import java.util.stream.Collectors;
 
 public class TxHandler {
 
-    private UTXOPool utxoPool;
+    private final UTXOPool utxoPool;
 
     /**
      * Creates a public ledger whose current UTXOPool (collection of unspent transaction outputs) is
@@ -26,62 +26,11 @@ public class TxHandler {
      *     values; and false otherwise.
      */
     public boolean isValidTx(Transaction tx) {
-        return tx != null
-                && areUnspent(tx.getInputs())
-                && haveValidSignatures(tx)
-                && !hasDoubleSpend(tx.getInputs())
-                && !hasNegativeOutputValues(tx.getOutputs())
-                && !createsValue(tx);
+        return isValidTx(tx, new TxValidation());
     }
 
-    private boolean areUnspent(List<Transaction.Input> inputs) {
-        return inputs.stream()
-                .map(i -> new UTXO(i.prevTxHash, i.outputIndex))
-                .allMatch(u -> utxoPool.contains(u));
-    }
-
-    private boolean haveValidSignatures(Transaction tx) {
-        List<Transaction.Input> inputs = tx.getInputs();
-        for (int i = 0; i < inputs.size(); i++) {
-            Transaction.Input input = inputs.get(i);
-            UTXO utxo = new UTXO(input.prevTxHash, input.outputIndex);
-            if (!utxoPool.contains(utxo)) {
-                return false;
-            }
-            Transaction.Output output = utxoPool.getTxOutput(utxo);
-            PublicKey publicKey = output.address;
-            byte[] signature = input.signature;
-            byte[] message = tx.getRawDataToSign(i);
-
-            if (!Crypto.verifySignature(publicKey, message, signature)) {
-                return false;
-            }
-        }
-        return true;
-    }
-
-    private boolean hasDoubleSpend(List<Transaction.Input> inputs) {
-        Set<UTXO> uniqueInputs = inputs.stream()
-                .map(i -> new UTXO(i.prevTxHash, i.outputIndex))
-                .collect(Collectors.toSet());
-        return inputs.size() > uniqueInputs.size();
-    }
-
-    private boolean hasNegativeOutputValues(List<Transaction.Output> outputs) {
-        return outputs.stream().allMatch(o -> o.value >= 0);
-    }
-
-    private boolean createsValue(Transaction tx) {
-        double inputsValue = tx.getInputs().stream()
-                .map(i -> new UTXO(i.prevTxHash, i.outputIndex))
-                .filter(utxo -> utxoPool.contains(utxo))
-                .map(utxo -> utxoPool.getTxOutput(utxo))
-                .mapToDouble(output -> output.value)
-                .sum();
-        double outputsValue = tx.getOutputs().stream()
-                .mapToDouble(output -> output.value)
-                .sum();
-        return outputsValue > inputsValue;
+    private boolean isValidTx(Transaction tx, TxValidation validation) {
+        return validation.isValid(tx);
     }
 
     /**
@@ -101,9 +50,12 @@ public class TxHandler {
 
         for (List<Transaction> txs : uniqueTxs.permutations()) {
             List<Transaction> validTxs = new ArrayList<>();
+            TxValidation validation = new TxValidation();
+
             for (int i=0; i<txs.size(); i++) {
                 Transaction t = txs.get(i);
-                if (isValidTx(t)) { //TODO validates txs in isolation, it can't be
+                if (validation.isValid(t)) {
+                    validation.process(t);
                     validTxs.add(t);
                 }
                 if (validTxs.size() == uniqueTxs.size()) {
@@ -195,6 +147,87 @@ public class TxHandler {
 
             private List<List<Transaction>> list() {
                 return Collections.unmodifiableList(permutations);
+            }
+        }
+    }
+
+
+    private class TxValidation {
+        private final UTXOPool validationUtxoPool;
+
+        private TxValidation() {
+            this.validationUtxoPool = (utxoPool == null) ? new UTXOPool() : new UTXOPool(utxoPool);
+        }
+
+        private boolean isValid(Transaction tx) {
+            return tx != null
+                    && areUnspent(tx.getInputs())
+                    && haveValidSignatures(tx)
+                    && !hasDoubleSpend(tx.getInputs())
+                    && !hasNegativeOutputValues(tx.getOutputs())
+                    && !createsValue(tx);
+        }
+
+        private boolean areUnspent(List<Transaction.Input> inputs) {
+            return inputs.stream()
+                    .map(i -> new UTXO(i.prevTxHash, i.outputIndex))
+                    .allMatch(u -> validationUtxoPool.contains(u));
+        }
+
+        private boolean haveValidSignatures(Transaction tx) {
+            List<Transaction.Input> inputs = tx.getInputs();
+            for (int i = 0; i < inputs.size(); i++) {
+                Transaction.Input input = inputs.get(i);
+                UTXO utxo = new UTXO(input.prevTxHash, input.outputIndex);
+                if (!validationUtxoPool.contains(utxo)) {
+                    return false;
+                }
+                Transaction.Output output = validationUtxoPool.getTxOutput(utxo);
+                PublicKey publicKey = output.address;
+                byte[] signature = input.signature;
+                byte[] message = tx.getRawDataToSign(i);
+
+                if (!Crypto.verifySignature(publicKey, message, signature)) {
+                    return false;
+                }
+            }
+            return true;
+        }
+
+        private boolean hasDoubleSpend(List<Transaction.Input> inputs) {
+            Set<UTXO> uniqueInputs = inputs.stream()
+                    .map(i -> new UTXO(i.prevTxHash, i.outputIndex))
+                    .collect(Collectors.toSet());
+            return inputs.size() > uniqueInputs.size();
+        }
+
+        private boolean hasNegativeOutputValues(List<Transaction.Output> outputs) {
+            return outputs.stream().allMatch(o -> o.value >= 0);
+        }
+
+        private boolean createsValue(Transaction tx) {
+            double inputsValue = tx.getInputs().stream()
+                    .map(i -> new UTXO(i.prevTxHash, i.outputIndex))
+                    .filter(utxo -> validationUtxoPool.contains(utxo))
+                    .map(utxo -> validationUtxoPool.getTxOutput(utxo))
+                    .mapToDouble(output -> output.value)
+                    .sum();
+            double outputsValue = tx.getOutputs().stream()
+                    .mapToDouble(output -> output.value)
+                    .sum();
+            return outputsValue > inputsValue;
+        }
+
+        private void process(Transaction tx) {
+            if (isValid(tx)) {
+                tx.getInputs().stream()
+                        .map(i -> new UTXO(i.prevTxHash, i.outputIndex))
+                        .forEach(u -> validationUtxoPool.removeUTXO(u));
+
+                List<Transaction.Output> outputs = tx.getOutputs();
+                for (int i=0; i<outputs.size(); i++) {
+                    validationUtxoPool.addUTXO(new UTXO(tx.getHash(), i), outputs.get(i));
+                }
             }
         }
     }
