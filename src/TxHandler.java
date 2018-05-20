@@ -39,33 +39,30 @@ public class TxHandler {
      * updating the current UTXO pool as appropriate.
      */
     public Transaction[] handleTxs(Transaction[] possibleTxs) {
-        Transaction[] acceptedTxs = findLargestValidTxSet(possibleTxs);
+        Transaction[] acceptedTxs = findMaximalValidTxSet(possibleTxs);
         updateUtxoPool(acceptedTxs);
         return acceptedTxs;
     }
 
-    private Transaction[] findLargestValidTxSet(Transaction[] possibleTxs) {
-        UniqueTxCollection uniqueTxs = new UniqueTxCollection(possibleTxs);
-        List<Transaction> largestTxSet = new ArrayList<>();
-
-        for (List<Transaction> txs : uniqueTxs.permutations()) {
-            List<Transaction> validTxs = new ArrayList<>();
-            TxValidation validation = new TxValidation();
-
-            for (int i=0; i<txs.size(); i++) {
-                Transaction t = txs.get(i);
-                if (validation.isValid(t)) {
-                    validation.process(t);
-                    validTxs.add(t);
-                }
-                if (validTxs.size() == uniqueTxs.size()) {
-                    return toArray(txs);
-                } else if (validTxs.size() > largestTxSet.size()) {
-                    largestTxSet = validTxs;
+    private Transaction[] findMaximalValidTxSet(Transaction[] possibleTxs) {
+        List<Transaction> unprocessed = new UniqueTxCollection(possibleTxs).list();
+        List<Transaction> validTxs = new ArrayList<>();
+        TxValidation validation = new TxValidation();
+        int txsAdded;
+        do {
+            txsAdded = 0;
+            ListIterator<Transaction> iterator = unprocessed.listIterator();
+            while (iterator.hasNext()) {
+                Transaction tx = iterator.next();
+                if (validation.isValid(tx)) {
+                    validation.process(tx);
+                    validTxs.add(tx);
+                    iterator.remove();
+                    txsAdded++;
                 }
             }
-        }
-        return toArray(largestTxSet);
+        } while (unprocessed.size() > 0 && txsAdded > 0);
+        return toArray(validTxs);
     }
 
     private Transaction[] toArray (List<Transaction> txs) {
@@ -99,70 +96,27 @@ public class TxHandler {
 
     private class UniqueTxCollection {
         private final List<Transaction> transactions;
-        private final TxPermutations permutations;
 
         private UniqueTxCollection(Transaction[] txs) {
             if (txs == null) {
                 transactions = Collections.emptyList();
             } else {
                 Map<byte[], Transaction> txsByHash = Arrays.stream(txs)
-                        .filter(t -> t != null)
+                        .filter(Objects::nonNull)
                         .collect(Collectors.toMap(
                                 Transaction::getHash,
                                 Function.identity(),
                                 (t1, t2) -> t1));
                 transactions = Collections.unmodifiableList(new ArrayList<>(txsByHash.values()));
             }
-            permutations = new TxPermutations();
         }
 
         private List<Transaction> list() {
-            return Collections.unmodifiableList(transactions);
-        }
-
-        private List<List<Transaction>> permutations() {
-            return permutations.list();
+            return new ArrayList<>(transactions);
         }
 
         private int size() {
             return transactions.size();
-        }
-
-
-        private class TxPermutations {
-            private final List<List<Transaction>> permutations = new ArrayList<>();
-
-            private TxPermutations() {
-                permutations(transactions, 0, Collections.emptyList());
-            }
-
-            private void permutations(List<Transaction> txs, int index, List<Transaction> permutation) {
-                if (index < txs.size()) {
-                    for (Transaction t : minus(txs, permutation)) {
-                        permutations(txs, index + 1, union(permutation, t));
-                    }
-                } else {
-                    permutations.add(permutation);
-                }
-            }
-
-            private List<Transaction> minus(List<Transaction> set, List<Transaction> subset) {
-                List<Transaction> result = new ArrayList<>(set);
-                for (Transaction t : subset) {
-                    result.remove(t);
-                }
-                return Collections.unmodifiableList(result);
-            }
-
-            private List<Transaction> union(List<Transaction> txs, Transaction t) {
-                List<Transaction> result = new ArrayList<>(txs);
-                result.add(t);
-                return Collections.unmodifiableList(result);
-            }
-
-            private List<List<Transaction>> list() {
-                return Collections.unmodifiableList(permutations);
-            }
         }
     }
 
